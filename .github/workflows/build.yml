@@ -19,6 +19,7 @@ jobs:
     - name: Unzip the LATEST uploaded ZIP file
       run: |
         latest_zip=$(ls -t *.zip | head -1)
+        echo "Unzipping $latest_zip..."
         unzip -q "$latest_zip" -d my_project/
 
     - name: Set up JDK 17
@@ -29,21 +30,32 @@ jobs:
 
     - name: Fix duplicate resources and Build APK
       run: |
-        # البحث التلقائي عن المجلد الداخلي الذي يحتوي على المشروع
-        PROJECT_ROOT=$(dirname $(find my_project -name "gradlew" | head -1))
-        echo "Project root found at: $PROJECT_ROOT"
+        echo "--- عرض محتويات المجلد للتحقق ---"
+        find my_project -maxdepth 3
+        echo "--------------------------------"
+        
+        # البحث عن ملف settings.gradle أو settings.gradle.kts
+        SETTINGS_FILE=$(find my_project -name "settings.gradle*" | head -1)
+        
+        if [ -z "$SETTINGS_FILE" ]; then
+          echo "خطأ: لم يتم العثور على ملف إعدادات جاردل. يبدو أن الملف المضغوط ناقص."
+          exit 1
+        fi
+        
+        PROJECT_ROOT=$(dirname "$SETTINGS_FILE")
+        echo "تم العثور على ملفات البناء في: $PROJECT_ROOT"
         cd "$PROJECT_ROOT"
         
         # حذف الملف المكرر لتجنب الأخطاء السابقة
         rm -f app/src/main/res/values/styles.xml
         
-        # بناء التطبيق
+        # إعطاء الصلاحيات وبناء التطبيق
         chmod +x gradlew
         ./gradlew assembleDebug
 
     - name: Upload final APK
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: HumanitarianAid-Ready
-        # البحث عن ملف الـ APK النهائي في أي مجلد فرعي
         path: my_project/**/app/build/outputs/apk/debug/*.apk
