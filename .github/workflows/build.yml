@@ -1,26 +1,51 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+name: Build APK Final
 
-    <application
-        android:name=".AidApplication"
-        android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
-        android:icon="@android:drawable/sym_def_app_icon"
-        android:label="Humanitarian Aid"
-        android:supportsRtl="true"
-        tools:targetApi="31">
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-    </application>
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-</manifest>
+    - name: Clean previous projects
+      run: rm -rf my_project
+
+    - name: Unzip the LATEST uploaded ZIP file
+      run: |
+        latest_zip=$(ls -t *.zip | head -1)
+        unzip -q "$latest_zip" -d my_project/
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Fix manifest and Build APK
+      run: |
+        cd my_project
+        
+        # حذف الملف المكرر لتجنب الأخطاء
+        rm -f app/src/main/res/values/styles.xml
+        
+        # إصلاح مشكلة الأيقونة والصور المفقودة آلياً قبل البناء
+        sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@android:drawable\/sym_def_app_icon"/g' app/src/main/AndroidManifest.xml
+        sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"//g' app/src/main/AndroidManifest.xml
+        
+        # توليد الملف الناقص وبناء التطبيق
+        chmod +x gradlew
+        gradle wrapper
+        ./gradlew assembleDebug
+
+    - name: Upload final APK
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: HumanitarianAid-Ready
+        path: my_project/**/app/build/outputs/apk/debug/*.apk
