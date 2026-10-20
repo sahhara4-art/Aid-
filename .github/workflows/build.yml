@@ -24,13 +24,17 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Build and Show All Logs
+    - name: Auto-Fix Duplicate Resources
+      run: |
+        echo "جاري حذف ملف styles.xml المكرر آلياً لحل التعارض..."
+        find . -name "styles.xml" -type f -delete
+
+    - name: Build and Compile APK
       run: |
         PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
         if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
         cd "$PROJECT_PATH"
         
-        # ترقية إصدار Gradle إلى 8.7 ليتوافق مع متطلبات المشروع
         gradle wrapper --gradle-version 8.7 || true
         chmod +x gradlew || true
         
