@@ -22,53 +22,41 @@ jobs:
     - name: Find and Prepare Project
       run: |
         if ls *.zip 1> /dev/null 2>&1; then
-          echo "تم العثور على ملف ZIP، جاري فك الضغط..."
           unzip -q *.zip -d extracted_project
           cp -r extracted_project/*/* ./ || cp -r extracted_project/* ./
         fi
-
         ROOT_DIR=$(dirname $(find . -name "settings.gradle.kts" | head -n 1))
-        if [ -z "$ROOT_DIR" ]; then
-          ROOT_DIR="."
-        fi
+        if [ -z "$ROOT_DIR" ]; then ROOT_DIR="."; fi
         echo "PROJECT_ROOT=$ROOT_DIR" >> $GITHUB_ENV
-
-    - name: AI Smart Cleanup & Memory Optimization
-      run: |
-        cd ${{ env.PROJECT_ROOT }}
-        
-        # تنظيف الملفات المكررة والرموز التالفة
-        find . -type f -name "*.kt" -exec sed -i '/h9q8u0ickgxZDWZoMyeljZAgcflFp9ZIdGxad68LJDL17ihwy/d' {} +
-        rm -f app/src/main/res/values/styles.xml
-        rm -f app/src/main/java/com/humanitarian/aidmanagement/util/ExcelParserHelper.kt
-        rm -f app/src/main/java/com/humanitarian/aidmanagement/data/local/dao/AidDaos.kt
-        rm -rf app/build .gradle app/.cxx app/build/generated
-        
-        # حقن إعدادات الذاكرة القصوى (RAM) لتجنب انهيار السيرفر
-        echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" >> gradle.properties
-        echo "org.gradle.workers.max=2" >> gradle.properties
 
     - name: Set up Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.4'
 
-    - name: Build and Compile APK (Force)
+    - name: Build and Catch Hidden Error
       run: |
         cd ${{ env.PROJECT_ROOT }}
-        
-        if [ ! -f "gradlew" ]; then
-          gradle wrapper --gradle-version 8.4
-        fi
-        
         chmod +x gradlew || true
         
-        # بناء التطبيق مع إجبار تخطي فحوصات Lint والاختبارات لتسريع وتقليل أخطاء البناء
-        ./gradlew clean assembleDebug --stacktrace --no-daemon -x lint -x test
+        echo "جاري بناء التطبيق بصمت للبحث عن الخطأ الحقيقي..."
+        # تشغيل البناء وحفظ السجل في ملف نصي بدلاً من طباعته
+        ./gradlew clean assembleDebug --no-daemon -x lint -x test > build_error_log.txt 2>&1 || B_FAILED=true
+        
+        # إذا فشل البناء، قم باستخراج الخطأ الحقيقي فقط
+        if [ "$B_FAILED" = true ]; then
+          echo "========================================================="
+          echo "🔴 الخطأ البرمجي الحقيقي موجود في الأسطر التالية 🔴"
+          echo "========================================================="
+          # استخراج الأسطر التي تحتوي على اسم الملف ونوع الخطأ
+          grep -iE "e: file.*|Unresolved reference|MissingType|Unresolved.*" build_error_log.txt | tail -n 15
+          echo "========================================================="
+          exit 1
+        fi
 
     - name: Upload Final Ready APK
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: HumanitarianAidManager-Final-APK
-        path: |
-          ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
+        path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
