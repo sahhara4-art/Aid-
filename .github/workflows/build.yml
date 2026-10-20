@@ -1,16 +1,47 @@
-    - name: Build and Catch Hidden Error
+name: Final Android Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Unzip Project
       run: |
-        cd ${{ env.PROJECT_ROOT }}
+        # فك الضغط بصمت وتجاهل الأخطاء إذا كان الملف مفتوحاً مسبقاً
+        unzip -q *.zip -d temp_project || true
+        cp -r temp_project/*/* ./ || cp -r temp_project/* ./ || true
+
+    - name: Setup Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Build and Show All Logs
+      run: |
+        # البحث عن المجلد الذي يحتوي على إعدادات التطبيق والدخول إليه
+        PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
+        if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
+        cd "$PROJECT_PATH"
+        
+        # التأكد من وجود مشغل البناء
+        gradle wrapper --gradle-version 8.4 || true
         chmod +x gradlew || true
         
-        echo "جاري بناء التطبيق بصمت للبحث عن الخطأ الحقيقي..."
-        ./gradlew clean assembleDebug --no-daemon -x lint -x test > build_error_log.txt 2>&1 || B_FAILED=true
-        
-        if [ "$B_FAILED" = true ]; then
-          echo "========================================================="
-          echo "🔴 السجل الكامل لسبب الفشل 🔴"
-          echo "========================================================="
-          tail -n 100 build_error_log.txt
-          echo "========================================================="
-          exit 1
-        fi
+        # أمر البناء المباشر مع طباعة كل التفاصيل والأخطاء
+        ./gradlew assembleDebug --stacktrace --info
+
+    - name: Upload Final APK
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: HumanitarianAidManager-APK
+        path: '**/*.apk'
