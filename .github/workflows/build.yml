@@ -26,10 +26,9 @@ jobs:
 
     - name: Auto-Fix Duplicate Resources
       run: |
-        echo "جاري حذف ملف styles.xml المكرر آلياً لحل التعارض..."
-        find . -name "styles.xml" -type f -delete
+        find . -name "styles.xml" -type f -delete || true
 
-    - name: Build and Compile APK
+    - name: Build and Sniper Catch Error
       run: |
         PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
         if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
@@ -38,10 +37,21 @@ jobs:
         gradle wrapper --gradle-version 8.7 || true
         chmod +x gradlew || true
         
-        ./gradlew assembleDebug --stacktrace --info
+        echo "جاري بناء التطبيق واستخراج الخطأ الحقيقي..."
+        ./gradlew assembleDebug --no-daemon > build_log.txt 2>&1 || B_FAILED=true
+        
+        if [ "$B_FAILED" = true ]; then
+          echo "========================================================="
+          echo "🔴 الخطأ البرمجي الحقيقي الذي يوقف التطبيق 🔴"
+          echo "========================================================="
+          # قنص الأخطاء البرمجية أو أخطاء المترجم حصراً
+          grep -A 3 -iE "^e: |What went wrong" build_log.txt
+          echo "========================================================="
+          exit 1
+        fi
 
     - name: Upload Final APK
-      if: always()
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: HumanitarianAidManager-APK
