@@ -15,7 +15,6 @@ jobs:
 
     - name: Unzip Project
       run: |
-        # فك الضغط بصمت وتجاهل الأخطاء إذا كان الملف مفتوحاً مسبقاً
         unzip -q *.zip -d temp_project || true
         cp -r temp_project/*/* ./ || cp -r temp_project/* ./ || true
 
@@ -27,16 +26,14 @@ jobs:
 
     - name: Build and Show All Logs
       run: |
-        # البحث عن المجلد الذي يحتوي على إعدادات التطبيق والدخول إليه
         PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
         if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
         cd "$PROJECT_PATH"
         
-        # التأكد من وجود مشغل البناء
-        gradle wrapper --gradle-version 8.4 || true
+        # ترقية إصدار Gradle إلى 8.7 ليتوافق مع متطلبات المشروع
+        gradle wrapper --gradle-version 8.7 || true
         chmod +x gradlew || true
         
-        # أمر البناء المباشر مع طباعة كل التفاصيل والأخطاء
         ./gradlew assembleDebug --stacktrace --info
 
     - name: Upload Final APK
