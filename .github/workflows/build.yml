@@ -1,62 +1,16 @@
-name: Build Humanitarian Aid Manager Android APK
-
-on:
-  push:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Find and Prepare Project
-      run: |
-        if ls *.zip 1> /dev/null 2>&1; then
-          unzip -q *.zip -d extracted_project
-          cp -r extracted_project/*/* ./ || cp -r extracted_project/* ./
-        fi
-        ROOT_DIR=$(dirname $(find . -name "settings.gradle.kts" | head -n 1))
-        if [ -z "$ROOT_DIR" ]; then ROOT_DIR="."; fi
-        echo "PROJECT_ROOT=$ROOT_DIR" >> $GITHUB_ENV
-
-    - name: Set up Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.4'
-
     - name: Build and Catch Hidden Error
       run: |
         cd ${{ env.PROJECT_ROOT }}
         chmod +x gradlew || true
         
         echo "جاري بناء التطبيق بصمت للبحث عن الخطأ الحقيقي..."
-        # تشغيل البناء وحفظ السجل في ملف نصي بدلاً من طباعته
         ./gradlew clean assembleDebug --no-daemon -x lint -x test > build_error_log.txt 2>&1 || B_FAILED=true
         
-        # إذا فشل البناء، قم باستخراج الخطأ الحقيقي فقط
         if [ "$B_FAILED" = true ]; then
           echo "========================================================="
-          echo "🔴 الخطأ البرمجي الحقيقي موجود في الأسطر التالية 🔴"
+          echo "🔴 السجل الكامل لسبب الفشل 🔴"
           echo "========================================================="
-          # استخراج الأسطر التي تحتوي على اسم الملف ونوع الخطأ
-          grep -iE "e: file.*|Unresolved reference|MissingType|Unresolved.*" build_error_log.txt | tail -n 15
+          tail -n 100 build_error_log.txt
           echo "========================================================="
           exit 1
         fi
-
-    - name: Upload Final Ready APK
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: HumanitarianAidManager-Final-APK
-        path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
