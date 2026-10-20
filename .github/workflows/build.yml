@@ -19,28 +19,31 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Unzip Project File
+    - name: Find and Prepare Project
       run: |
-        # البحث عن الملف المضغوط وفك ضغطه في المجلد الحالي
+        # فك الضغط إذا كان هناك ملف ZIP
         if ls *.zip 1> /dev/null 2>&1; then
           echo "تم العثور على ملف ZIP، جاري فك الضغط..."
           unzip -q *.zip -d extracted_project
-          # نقل الملفات المستخرجة إلى المسار الرئيسي
           cp -r extracted_project/*/* ./ || cp -r extracted_project/* ./
-          rm -rf extracted_project
         fi
 
-    - name: AI Smart Cleanup (Fix Duplicates & Corrupted Code)
+        # البحث الذكي عن مسار المشروع الحقيقي (مكان وجود settings.gradle.kts)
+        ROOT_DIR=$(dirname $(find . -name "settings.gradle.kts" | head -n 1))
+        if [ -z "$ROOT_DIR" ]; then
+          ROOT_DIR="."
+        fi
+        echo "PROJECT_ROOT=$ROOT_DIR" >> $GITHUB_ENV
+        echo "تم تحديد مسار المشروع في: $ROOT_DIR"
+
+    - name: AI Smart Cleanup
       run: |
-        echo "جاري تنظيف الكود من الرموز العشوائية..."
+        cd ${{ env.PROJECT_ROOT }}
+        echo "جاري تنظيف الكود من الرموز العشوائية والملفات المكررة..."
         find . -type f -name "*.kt" -exec sed -i '/h9q8u0ickgxZDWZoMyeljZAgcflFp9ZIdGxad68LJDL17ihwy/d' {} +
-        
-        echo "جاري حذف الملفات المكررة لمنع التعارض..."
         rm -f app/src/main/res/values/styles.xml
         rm -f app/src/main/java/com/humanitarian/aidmanagement/util/ExcelParserHelper.kt
         rm -f app/src/main/java/com/humanitarian/aidmanagement/data/local/dao/AidDaos.kt
-        
-        echo "جاري تنظيف الكاش الخاص بقواعد بيانات KSP و Room..."
         rm -rf app/build .gradle app/.cxx app/build/generated
 
     - name: Set up Gradle
@@ -50,14 +53,16 @@ jobs:
 
     - name: Build and Compile APK
       run: |
-        # التأكد من صلاحيات البناء
-        chmod +x gradlew || true
-        if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+        cd ${{ env.PROJECT_ROOT }}
+        
+        # توليد ملف gradlew تلقائياً في حال كان مفقوداً
+        if [ ! -f "gradlew" ]; then
+          echo "ملف gradlew مفقود، جاري توليده الآن..."
           gradle wrapper --gradle-version 8.4
         fi
-        chmod +x gradlew || true
         
-        # تنفيذ بناء نظيف بالكامل من الصفر
+        chmod +x gradlew || true
+        # البناء النظيف
         ./gradlew clean assembleDebug --stacktrace --no-daemon
 
     - name: Upload Final Ready APK
@@ -65,5 +70,4 @@ jobs:
       with:
         name: HumanitarianAidManager-Final-APK
         path: |
-          app/build/outputs/apk/debug/*.apk
-          android/app/build/outputs/apk/debug/*.apk
+          ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/*.apk
