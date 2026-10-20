@@ -1,8 +1,8 @@
-name: Build APK Final
+name: Build Humanitarian Aid Manager Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -13,50 +13,57 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Clean previous projects
-      run: rm -rf my_project
-
-    - name: Unzip the LATEST uploaded ZIP file
-      run: |
-        latest_zip=$(ls -t *.zip | head -1)
-        echo "Unzipping $latest_zip..."
-        unzip -q "$latest_zip" -d my_project/
-
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Fix errors and Build APK
+    - name: Unzip Project File
       run: |
-        # التأكد من مسار المشروع المفقوك
-        PROJECT_ROOT=$(find my_project -name "settings.gradle*" -o -name "build.gradle*" | head -1 | xargs dirname)
-        if [ -z "$PROJECT_ROOT" ]; then
-          PROJECT_ROOT="my_project"
+        # البحث عن الملف المضغوط وفك ضغطه في المجلد الحالي
+        if ls *.zip 1> /dev/null 2>&1; then
+          echo "تم العثور على ملف ZIP، جاري فك الضغط..."
+          unzip -q *.zip -d extracted_project
+          # نقل الملفات المستخرجة إلى المسار الرئيسي
+          cp -r extracted_project/*/* ./ || cp -r extracted_project/* ./
+          rm -rf extracted_project
         fi
-        cd "$PROJECT_ROOT"
+
+    - name: AI Smart Cleanup (Fix Duplicates & Corrupted Code)
+      run: |
+        echo "جاري تنظيف الكود من الرموز العشوائية..."
+        find . -type f -name "*.kt" -exec sed -i '/h9q8u0ickgxZDWZoMyeljZAgcflFp9ZIdGxad68LJDL17ihwy/d' {} +
         
-        # حذف الملفات المكررة فقط إن وجدت لتجنب التعارض
+        echo "جاري حذف الملفات المكررة لمنع التعارض..."
         rm -f app/src/main/res/values/styles.xml
         rm -f app/src/main/java/com/humanitarian/aidmanagement/util/ExcelParserHelper.kt
         rm -f app/src/main/java/com/humanitarian/aidmanagement/data/local/dao/AidDaos.kt
         
-        # إصلاح مشكلة الأيقونة إن وجدت
-        if [ -f "app/src/main/AndroidManifest.xml" ]; then
-          sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@android:drawable\/sym_def_app_icon"/g' app/src/main/AndroidManifest.xml
-          sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"//g' app/src/main/AndroidManifest.xml
-        fi
-        
-        # بناء التطبيق بأكوادك الكاملة
-        chmod +x gradlew
-        gradle wrapper
-        ./gradlew assembleDebug
+        echo "جاري تنظيف الكاش الخاص بقواعد بيانات KSP و Room..."
+        rm -rf app/build .gradle app/.cxx app/build/generated
 
-    - name: Upload final APK
-      uses: actions/upload-artifact@v4
-      if: always()
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v3
       with:
-        name: HumanitarianAid-Ready
+        gradle-version: '8.4'
+
+    - name: Build and Compile APK
+      run: |
+        # التأكد من صلاحيات البناء
+        chmod +x gradlew || true
+        if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+          gradle wrapper --gradle-version 8.4
+        fi
+        chmod +x gradlew || true
+        
+        # تنفيذ بناء نظيف بالكامل من الصفر
+        ./gradlew clean assembleDebug --stacktrace --no-daemon
+
+    - name: Upload Final Ready APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: HumanitarianAidManager-Final-APK
         path: |
-          **/*/build/outputs/apk/debug/*.apk
+          app/build/outputs/apk/debug/*.apk
+          android/app/build/outputs/apk/debug/*.apk
