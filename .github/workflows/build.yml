@@ -28,14 +28,14 @@ jobs:
       run: |
         find . -name "styles.xml" -type f -delete || true
 
-    - name: Build APK
+    - name: Build APK Clean
       run: |
         PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
         if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
         cd "$PROJECT_PATH"
         
-        chmod +x gradlew || true
-        ./gradlew assembleDebug --stacktrace
+        chmod +x gradlew
+        ./gradlew clean assembleDebug --stacktrace --no-daemon
 
     - name: Upload Final APK
       if: success()
