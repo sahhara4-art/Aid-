@@ -28,27 +28,14 @@ jobs:
       run: |
         find . -name "styles.xml" -type f -delete || true
 
-    - name: Build and Sniper Catch Error
+    - name: Build APK
       run: |
         PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
         if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
         cd "$PROJECT_PATH"
         
-        gradle wrapper --gradle-version 8.7 || true
         chmod +x gradlew || true
-        
-        echo "جاري بناء التطبيق واستخراج الخطأ الحقيقي..."
-        ./gradlew assembleDebug --no-daemon > build_log.txt 2>&1 || B_FAILED=true
-        
-        if [ "$B_FAILED" = true ]; then
-          echo "========================================================="
-          echo "🔴 الخطأ البرمجي الحقيقي الذي يوقف التطبيق 🔴"
-          echo "========================================================="
-          # قنص الأخطاء البرمجية أو أخطاء المترجم حصراً
-          grep -A 3 -iE "^e: |What went wrong" build_log.txt
-          echo "========================================================="
-          exit 1
-        fi
+        ./gradlew assembleDebug --stacktrace
 
     - name: Upload Final APK
       if: success()
