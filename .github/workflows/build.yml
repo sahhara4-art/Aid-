@@ -24,18 +24,31 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Auto-Fix Duplicate Resources
+    - name: Purge Broken Gradle Wrapper
       run: |
-        find . -name "styles.xml" -type f -delete || true
+        PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
+        if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
+        cd "$PROJECT_PATH"
+        
+        # تدمير ملف الwrapper القديم الذي يجبر النظام على التحميل الفاشل
+        rm -rf gradle/wrapper/gradle-wrapper.properties
+        
+        # إنشاء ملف wrapper جديد نظيف ومحلي 100% لا يحتاج إنترنت
+        mkdir -p gradle/wrapper
+        echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+        echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
+        echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+        echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
 
-    - name: Build APK Clean
+    - name: Build APK Final
       run: |
         PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
         if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
         cd "$PROJECT_PATH"
         
         chmod +x gradlew
-        ./gradlew clean assembleDebug --stacktrace --no-daemon
+        ./gradlew assembleDebug --stacktrace --no-daemon
 
     - name: Upload Final APK
       if: success()
