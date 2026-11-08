@@ -24,16 +24,17 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Auto-Fix Duplicate Resources
+      run: |
+        find . -name "styles.xml" -type f -delete || true
+
     - name: Purge Broken Gradle Wrapper
       run: |
         PROJECT_PATH=$(dirname $(find . -name "settings.gradle*" | head -n 1))
         if [ -z "$PROJECT_PATH" ]; then PROJECT_PATH="."; fi
         cd "$PROJECT_PATH"
         
-        # تدمير ملف الwrapper القديم الذي يجبر النظام على التحميل الفاشل
         rm -rf gradle/wrapper/gradle-wrapper.properties
-        
-        # إنشاء ملف wrapper جديد نظيف ومحلي 100% لا يحتاج إنترنت
         mkdir -p gradle/wrapper
         echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
         echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
